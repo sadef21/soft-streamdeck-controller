@@ -49,7 +49,7 @@ function audioOf(ctx) {
 // open — вывести окно плеера, seek — перемотать на seconds (минус — назад)
 const MEDIA_COMMANDS = ['playpause', 'next', 'prev', 'seek', 'shuffle', 'repeat', 'open']
 
-// ctx: { switchPage(name), openPanel(panel), audio, media } — то, что действию нужно от основного цикла
+// ctx: { switchPage(name), openPanel(panel), enterIdle(), audio, media } — то, что действию нужно от основного цикла
 export async function execute(action, ctx) {
     switch (action.type) {
         case 'hotkey': return tapCombo(action.keys)
@@ -76,6 +76,8 @@ export async function execute(action, ctx) {
             if (action.command === 'open') return openPlayer(ctx.media.state.media?.app)
             return ctx.media.command(action.command)
         case 'player': return ctx.openPanel({ kind: 'player' })
+        // «Заблокировать» деку: показать окно ожидания, первое нажатие вернёт кнопки
+        case 'idle': return ctx.enterIdle()
         case 'system': return systemCommand(action.command)
         case 'macro':
             for (const step of action.steps) {
@@ -154,6 +156,7 @@ export function validate(action, where, pages) {
             }
             break
         case 'player':
+        case 'idle':
             break
         case 'system':
             if (action.command !== 'lock') fail('"command" должен быть "lock" (заблокировать компьютер)')

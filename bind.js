@@ -108,11 +108,10 @@ function saveToggles() {
 }
 const toggleId = (page, index) => `${page}/${index}`
 
-// Окно ожидания и сон экрана
+// Окно ожидания
 let lastActivity = Date.now()
 let idleActive = false
 let pageBeforeIdle = null
-let asleep = false
 
 // Данные для индикаторов на кнопках
 const currentSources = () => ({
@@ -129,7 +128,6 @@ const status = () => ({
     ...currentSources(),
     idle: idleActive,
     panel: panel ? (panel.kind === 'player' ? 'player' : panel.target) : null,
-    asleep,
 })
 
 // Сервер стартует первым: занятый порт значит, что утилита уже запущена.
@@ -372,7 +370,7 @@ function refreshKey(index) {
 }
 
 function refreshKeys(filter) {
-    if (!connected || (asleep && !(config.sleep?.brightness > 0))) return
+    if (!connected) return
     for (const [index, key] of Object.entries(visibleKeys())) {
         if (filter(key)) refreshKey(Number(index))
     }
@@ -440,7 +438,6 @@ function calibrate(layout) {
     const problem = layoutProblem(layout)
     if (problem) throw new Error(`Раскладка: ${problem}`)
     calibration = layoutOf(layout)
-    wake()
     // Если конфигуратор закрыли, не дождавшись «Готово», кнопки вернутся сами
     calibrationTimer = setTimeout(() => calibrate(null), CALIBRATION_TIMEOUT_MS)
     if (connected) drawCalibration().catch(err => console.error(`Не удалось показать разметку: ${err.message}`))
@@ -474,11 +471,17 @@ function switchPage(name) {
     return renderPage()
 }
 
-/* ---------- Окно ожидания и сон ---------- */
+/* ---------- Окно ожидания ---------- */
 
-const normalBrightness = () => (config.brightness ?? 10) / 10
-// Экран во сне погашен совсем: первое нажатие только будит
-const screenDark = () => asleep && !(config.sleep?.brightness > 0)
+// Яркость экрана сейчас: в окне ожидания — своя (idle.brightness), если задана
+const currentBrightness = () => {
+    const level = idleActive && config.idle?.brightness !== undefined ? config.idle.brightness : (config.brightness ?? 10)
+    return level / 10
+}
+
+function setBrightness() {
+    if (connected) device.setBrightness(currentBrightness()).catch(() => {})
+}
 
 function enterIdle() {
     const page = config.idle?.page
@@ -490,6 +493,7 @@ function enterIdle() {
     currentPage = page
     console.log('Окно ожидания')
     web.broadcast('status', status())
+    setBrightness()
     if (connected) renderPage()
     return true
 }
@@ -499,30 +503,13 @@ function exitIdle() {
     idleActive = false
     currentPage = config.pages[pageBeforeIdle] ? pageBeforeIdle : startPageOf(config)
     web.broadcast('status', status())
+    setBrightness()
     if (connected) renderPage()
 }
 
-function fallAsleep() {
-    asleep = true
-    console.log('Сон экрана')
-    device.setBrightness((config.sleep?.brightness ?? 0) / 10)
-    web.broadcast('status', status())
-}
-
-function wake() {
-    if (!asleep) return
-    asleep = false
-    device.setBrightness(normalBrightness())
-    web.broadcast('status', status())
-    // Пока экран был погашен, индикаторы не обновлялись
-    refreshKeys(key => !!key.meter)
-}
-
 function checkIdle() {
-    const idleFor = Date.now() - lastActivity
-    const { idle, sleep } = config
-    if (!idleActive && idle?.after > 0 && config.pages[idle.page] && idleFor >= idle.after * 1000) enterIdle()
-    if (!asleep && sleep?.after > 0 && idleFor >= sleep.after * 60000) fallAsleep()
+    const { idle } = config
+    if (!idleActive && idle?.after > 0 && config.pages[idle.page] && Date.now() - lastActivity >= idle.after * 1000) enterIdle()
 }
 
 /* ---------- Нажатия ---------- */
@@ -530,6 +517,9 @@ function checkIdle() {
 const actionContext = {
     switchPage,
     openPanel,
+    enterIdle: () => {
+        if (!enterIdle()) throw new Error('окно ожидания не настроено: выберите для него страницу')
+    },
     get audio() { return audio },
     get media() { return media },
 }
@@ -588,7 +578,7 @@ function stopRepeat(id) {
     repeaters.delete(id)
 }
 
-const consumedKeys = new Set() // нажатия, которые только разбудили экран
+const consumedKeys = new Set() // нажатия, которые только вернули кнопки из окна ожидания
 const longPresses = new Map() // кнопки с долгим нажатием, которые сейчас зажаты
 
 device.on('connect', async () => {
@@ -597,7 +587,7 @@ device.on('connect', async () => {
     console.log('Razer Stream Controller X подключён')
     web.broadcast('status', status())
     tray?.setStatus('устройство подключено', true)
-    await device.setBrightness(asleep ? (config.sleep?.brightness ?? 0) / 10 : normalBrightness())
+    await device.setBrightness(currentBrightness())
     try {
         await clearScreen()
     } catch (err) {
@@ -619,10 +609,8 @@ device.on('disconnect', () => {
 device.on('down', ({ id }) => {
     if (typeof id !== 'number') return
     lastActivity = Date.now()
-    // Первое нажатие в окне ожидания или на погашенном экране только возвращает кнопки
-    const consume = idleActive || screenDark()
-    wake()
-    if (consume) {
+    // Первое нажатие в окне ожидания только возвращает кнопки (и обычную яркость)
+    if (idleActive) {
         exitIdle()
         consumedKeys.add(id)
         return
@@ -697,9 +685,8 @@ fs.watch(configPath, () => {
             weather?.setPlace(config.weather)
             console.log('Конфиг перезагружен')
             web.broadcast('config', { version })
-            wake()
             web.broadcast('status', status())
-            device.setBrightness(normalBrightness())
+            setBrightness()
             if (connected) {
                 if (layoutChanged || wasCalibrating) clearScreen().then(renderPage).catch(err => console.error(err.message))
                 else renderPage()

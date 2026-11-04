@@ -22,7 +22,7 @@
       },
       "11": { "label": "Рабочий стол", "color": "#64748b", "action": { "type": "hotkey", "keys": "win+d" } },
       "12": { "label": "Проводник", "color": "#f59e0b", "action": { "type": "hotkey", "keys": "win+e" }, "icon": "lucide:folder-open" },
-      "13": { "label": "Ожидание", "color": "#4ade80", "action": { "type": "page", "page": "Ожидание" }, "icon": "lucide:clock" },
+      "13": { "label": "Ожидание", "color": "#5c6bc0", "action": { "type": "idle" } },
       "14": {
         "label": "Звук",
         "color": "#1565c0",
@@ -50,6 +50,5 @@
       "14": { "label": "Диск", "meter": "disk", "color": "#ef6c00" }
     }
   },
-  "idle": { "after": 60, "page": "Ожидание" },
-  "sleep": { "after": 15, "brightness": 1 }
+  "idle": { "after": 60, "page": "Ожидание", "brightness": 3 }
 }

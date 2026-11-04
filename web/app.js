@@ -38,12 +38,13 @@ const ACTIONS = {
     mute: { label: 'Без звука', icon: 'volume-x' },
     mixer: { label: 'Регулятор', icon: 'sliders-horizontal' },
     player: { label: 'Плеер', icon: 'disc-3' },
+    idle: { label: 'Ожидание', icon: 'moon' },
     volumeSet: { label: 'Уровень', icon: 'gauge' },
     media: { label: 'Музыка', icon: 'music' },
     system: { label: 'Компьютер', icon: 'lock' },
     delay: { label: 'Пауза', icon: 'hourglass' },
 }
-const KEY_ACTIONS = ['hotkey', 'text', 'run', 'open', 'macro', 'page', 'volume', 'mute', 'mixer', 'media', 'player', 'system']
+const KEY_ACTIONS = ['hotkey', 'text', 'run', 'open', 'macro', 'page', 'volume', 'mute', 'mixer', 'media', 'player', 'idle', 'system']
 const STEP_ACTIONS = ['hotkey', 'text', 'delay', 'run', 'open', 'page', 'volume', 'mute', 'media', 'system']
 const SYSTEM_COMMANDS = [['lock', 'Заблокировать (как Win+L)']]
 const MEDIA_COMMANDS = [['playpause', 'Пауза / продолжить'], ['next', 'Следующий трек'], ['prev', 'Предыдущий трек'],
@@ -237,6 +238,7 @@ function defaultAction(type) {
         case 'mute': return { type, target: 'speakers' }
         case 'mixer': return { type, target: 'speakers' }
         case 'player': return { type }
+        case 'idle': return { type }
         case 'volumeSet': return { type, target: 'speakers', value: 50 }
         case 'media': return { type, command: 'playpause' }
         case 'system': return { type, command: 'lock' }
@@ -834,7 +836,7 @@ function stylePicker() {
     }))
 }
 
-// Общие настройки: устройство, ожидание и сон, подсказки
+// Общие настройки: устройство, окно ожидания, копии, подсказки
 function globalPanel() {
     const brightness = state.config.brightness ?? 10
     const output = h('output', {}, brightness)
@@ -897,7 +899,7 @@ function globalPanel() {
                     ? 'На устройстве сейчас зелёные рамки. Двигайте их, пока каждая не будет видна в своём окошке одинаково со всех сторон, затем сохраните.'
                     : 'Если кнопки на устройстве сдвинуты относительно окошек или край обрезан рамкой.'))),
         h('section', { class: 'section', id: 'updates-section' }, h('h3', {}, 'Обновления'), h('div', { id: 'updates' }, updatesView()))],
-        tab === 'idle' && [panelHead('Для всех страниц', 'Ожидание и сон'), h('section', { class: 'section' }, idleEditor())],
+        tab === 'idle' && [panelHead('Для всех страниц', 'Окно ожидания'), h('section', { class: 'section' }, idleEditor())],
         tab === 'backups' && [panelHead('Для всех страниц', 'Резервные копии'), h('section', { class: 'section' }, backupsEditor())])
 }
 
@@ -1136,16 +1138,10 @@ function idleBadgeText() {
 function idleEditor() {
     const config = state.config
     const idle = config.idle ?? {}
-    const sleep = config.sleep ?? {}
     const setIdle = (field, value) => {
         config.idle = { ...config.idle, [field]: value }
         changed()
         renderTabs()
-        renderInspector()
-    }
-    const setSleep = (field, value) => {
-        config.sleep = { ...config.sleep, [field]: value }
-        changed()
         renderInspector()
     }
     const createIdlePage = () => {
@@ -1159,8 +1155,11 @@ function idleEditor() {
         toast('Страница ожидания создана — сохраните, чтобы она заработала')
     }
     const current = idlePage()
-    const sleepBrightness = sleep.brightness ?? 0
-    const sleepOutput = h('output', {}, sleepBrightness ? sleepBrightness : 'выкл')
+    // Яркость в ожидании: не задана — как обычно (config.brightness)
+    const normal = config.brightness ?? 10
+    const idleBrightness = idle.brightness ?? normal
+    const brightnessText = value => (value === 0 ? 'выкл' : String(value))
+    const brightnessOutput = h('output', {}, brightnessText(idleBrightness))
     const savedIdle = JSON.parse(state.savedJson || '{}').idle
     return h('div', { class: 'stack' },
         field('Окно ожидания', h('div', { class: 'row wrap' },
@@ -1178,23 +1177,23 @@ function idleEditor() {
             class: 'btn small ghost',
             onclick: () => api('POST', '/api/device', { command: 'idle' }).catch(err => toast(err.message, { type: 'error' })),
         }, icon('monitor'), 'Показать на устройстве')),
-        field('Сон экрана', selectBox([[0, 'Не гасить'], [5, 'через 5 минут'], [10, 'через 10 минут'], [15, 'через 15 минут'],
-            [30, 'через 30 минут'], [60, 'через 1 час']], sleep.after ?? 0, value => setSleep('after', Number(value))),
-        'Через это время без нажатий экран тускнеет. Первое нажатие только будит его.'),
-        sleep.after > 0 && field('Яркость во сне', h('div', { class: 'range-row' },
+        field('Яркость в ожидании', h('div', { class: 'range-row' },
             h('input', {
                 type: 'range',
                 min: 0,
-                max: 5,
+                max: 10,
                 step: 1,
-                value: sleepBrightness,
+                value: idleBrightness,
                 oninput: e => {
-                    config.sleep = { ...config.sleep, brightness: Number(e.target.value) }
-                    sleepOutput.textContent = Number(e.target.value) || 'выкл'
+                    const value = Number(e.target.value)
+                    config.idle = { ...config.idle, brightness: value }
+                    // Как обычно — значит, не задана: поменяют общую яркость — поменяется и эта
+                    if (value === normal) delete config.idle.brightness
+                    brightnessOutput.textContent = brightnessText(value)
                     renderDirty()
                 },
             }),
-            sleepOutput), '0 — экран гаснет совсем.'))
+            brightnessOutput), `Пока показано окно ожидания, экран светит так. Первое нажатие возвращает кнопки и обычную яркость (${normal}). 0 — экран гаснет.`))
 }
 
 function keyPanel(index) {
@@ -1589,6 +1588,9 @@ function actionBody(action, { inMacro = false, key = null, allowHold = !inMacro 
         case 'volume': return volumeEditor(action, key)
         case 'mute': return muteEditor(action, key)
         case 'mixer': return mixerEditor(action)
+        case 'idle': return h('p', { class: 'field-hint flush' }, idlePage()
+            ? 'Сразу показывает окно ожидания — как будто деку «заблокировали». Первое нажатие любой кнопки только возвращает кнопки.'
+            : 'Окно ожидания ещё не настроено — выберите для него страницу на вкладке «Ожидание» слева.')
         case 'player': return h('p', { class: 'field-hint flush' }, 'Кнопки устройства на время превращаются в пульт плеера: '
             + 'по бокам треки и перемотка на 10 и 30 с, в центре пауза, сверху обложка, перемешивание и повтор, '
             + 'снизу «Закрыть». Сам закрывается через 5 секунд без нажатий. '

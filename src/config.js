@@ -50,15 +50,12 @@ export function validateConfig(config, configDir) {
         throw new Error('"longPressMs" должен быть числом от 200 до 3000 (миллисекунды)')
     }
     if (config.idle !== undefined) {
-        const { after, page } = config.idle ?? {}
+        const { after, page, brightness: idleBrightness } = config.idle ?? {}
         if (after !== undefined && !isNumber(after, 0, 86400)) throw new Error('"idle.after" — через сколько секунд показать окно ожидания (0 — никогда)')
         if (page !== undefined && !config.pages[page]) throw new Error(`Страница окна ожидания "${page}" не найдена`)
+        if (idleBrightness !== undefined && !isNumber(idleBrightness, 0, 10)) throw new Error('"idle.brightness" — яркость в окне ожидания, от 0 до 10')
     }
-    if (config.sleep !== undefined) {
-        const { after, brightness: sleepBrightness } = config.sleep ?? {}
-        if (after !== undefined && !isNumber(after, 0, 1440)) throw new Error('"sleep.after" — через сколько минут погасить экран (0 — никогда)')
-        if (sleepBrightness !== undefined && !isNumber(sleepBrightness, 0, 10)) throw new Error('"sleep.brightness" должен быть числом от 0 до 10')
-    }
+    // "sleep" (сон экрана) больше не используется: старые конфиги с ним просто его игнорируют
     if (config.layout !== undefined) {
         const problem = layoutProblem(config.layout)
         if (problem) throw new Error(`"layout": ${problem}`)

@@ -217,6 +217,7 @@ function autoIcon(action, on) {
             return on ? 'volume-x' : 'volume-2'
         case 'mixer': return action.target ? 'sliders-horizontal' : 'x'
         case 'player': return 'disc-3'
+        case 'idle': return 'moon'
         case 'volumeSet': return 'gauge'
         default: return null
     }
