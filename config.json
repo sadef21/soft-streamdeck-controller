@@ -12,9 +12,12 @@
         "meter": "mic",
         "longPress": { "type": "mixer", "target": "mic" }
       },
-      "1": { "label": "Предыдущий", "color": "#1db954", "icon": "lucide:skip-back", "action": { "type": "media", "command": "prev" } },
-      "2": { "meter": "nowPlaying", "color": "#1db954", "action": { "type": "media", "command": "playpause" }, "longPress": { "type": "player" } },
-      "3": { "label": "Следующий", "color": "#1db954", "icon": "lucide:skip-forward", "action": { "type": "media", "command": "next" } },
+      "2": {
+        "meter": "nowPlaying",
+        "color": "#1db954",
+        "action": { "type": "media", "command": "playpause" },
+        "longPress": { "type": "player" }
+      },
       "4": {
         "label": "Звук",
         "color": "#1565c0",
@@ -34,7 +37,8 @@
       "8": { "label": "Заблокировать", "color": "#90a4ae", "action": { "type": "system", "command": "lock" } },
       "11": { "icon": "lucide:rocket" },
       "12": { "icon": "lucide:sparkles" },
-      "13": { "icon": "lucide:thumbs-up" }
+      "13": { "icon": "lucide:thumbs-up" },
+      "14": { "label": "Ожидание", "color": "#5c6bc0", "action": { "type": "idle" } }
     },
     "Ожидание": {
       "0": { "label": "Микрофон", "meter": "mic", "color": "#ad1457" },
@@ -57,10 +61,6 @@
   "idle": {
     "after": 30,
     "page": "Ожидание"
-  },
-  "sleep": {
-    "after": 10,
-    "brightness": 1
   },
   "weather": {
     "city": "Киев",
