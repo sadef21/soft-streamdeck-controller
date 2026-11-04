@@ -24,7 +24,8 @@
         "icon": "lucide:mic",
         "action": { "type": "mute", "target": "mic" },
         "toggle": { "source": "mic", "label": "Микрофон\nвыключен", "icon": "lucide:mic-off", "color": "#c62828" },
-        "meter": "mic"
+        "meter": "mic",
+        "longPress": { "type": "mixer", "target": "mic" }
       },
       "11": { "icon": "lucide:rocket" },
       "12": { "icon": "lucide:sparkles" },
@@ -35,7 +36,8 @@
         "icon": "lucide:volume-2",
         "action": { "type": "mute", "target": "speakers" },
         "toggle": { "source": "speakers", "label": "Без звука", "icon": "lucide:volume-x", "color": "#c62828" },
-        "meter": "volume"
+        "meter": "volume",
+        "longPress": { "type": "mixer", "target": "speakers" }
       }
     },
     "Ожидание": {
