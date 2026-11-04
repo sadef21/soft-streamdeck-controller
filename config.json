@@ -39,21 +39,21 @@
       }
     },
     "Ожидание": {
-      "0": { "label": "Микрофон", "meter": "mic", "color": "#ec407a" },
-      "1": { "meter": "netDown", "color": "#00838f", "label": "Загрузка" },
-      "2": { "meter": "nowPlaying", "color": "#1db954" },
-      "3": { "label": "Отдача", "meter": "netUp", "color": "#6a1b9a" },
-      "4": { "label": "Звук", "meter": "volume", "color": "#26a69a" },
-      "5": { "meter": "clock-h1", "color": "#4ade80" },
-      "6": { "meter": "clock-h2", "color": "#4ade80" },
-      "7": { "meter": "clock-colon", "color": "#4ade80" },
-      "8": { "meter": "clock-m1", "color": "#4ade80" },
-      "9": { "meter": "clock-m2", "color": "#4ade80" },
-      "10": { "meter": "cpu", "color": "#b71c1c", "label": "ЦП" },
-      "11": { "meter": "gpu", "color": "#1565c0", "label": "ГП" },
-      "12": { "meter": "weather", "color": "#5c6bc0" },
-      "13": { "meter": "ram", "color": "#2e7d32", "label": "ОЗУ" },
-      "14": { "meter": "disk", "color": "#ef6c00", "label": "Диск" }
+      "0": { "label": "Микрофон", "meter": "mic", "color": "#ad1457" },
+      "1": { "meter": "netDown", "color": "#00695c", "label": "Загрузка" },
+      "2": { "meter": "nowPlaying", "color": "#000000" },
+      "3": { "label": "Отдача", "meter": "netUp", "color": "#4527a0" },
+      "4": { "label": "Звук", "meter": "volume", "color": "#2e7d32" },
+      "5": { "meter": "clock-h1", "color": "#000000" },
+      "6": { "meter": "clock-h2", "color": "#000000" },
+      "7": { "meter": "clock-colon", "color": "#000000" },
+      "8": { "meter": "clock-m1", "color": "#000000" },
+      "9": { "meter": "clock-m2", "color": "#000000" },
+      "10": { "meter": "cpu", "color": "#ff0000", "label": "ЦП" },
+      "11": { "meter": "gpu", "color": "#0000ff", "label": "ГП" },
+      "12": { "meter": "weather", "color": "#000000" },
+      "13": { "meter": "ram", "color": "#00ff00", "label": "ОЗУ" },
+      "14": { "meter": "disk", "color": "#ffff02", "label": "Диск" }
     }
   },
   "idle": {
@@ -82,6 +82,5 @@
       96,
       193
     ]
-  },
-  "keyStyle": "neon"
+  }
 }
