@@ -1590,8 +1590,8 @@ function actionBody(action, { inMacro = false, key = null, allowHold = !inMacro 
         case 'mute': return muteEditor(action, key)
         case 'mixer': return mixerEditor(action)
         case 'player': return h('p', { class: 'field-hint flush' }, 'Кнопки устройства на время превращаются в пульт плеера: '
-            + 'по бокам треки и перемотка на 10 и 30 с, в центре звук и пауза, сверху обложка, перемешивание и повтор, '
-            + 'снизу «Закрыть» и «Открыть плеер». Сам закрывается через 5 секунд без нажатий. '
+            + 'по бокам треки и перемотка на 10 и 30 с, в центре пауза, сверху обложка, перемешивание и повтор, '
+            + 'снизу «Закрыть». Сам закрывается через 5 секунд без нажатий. '
             + 'Удобно повесить на долгое нажатие кнопки «Сейчас играет».')
         case 'volumeSet': return volumeSetEditor(action)
         case 'media': return mediaEditor(action)

@@ -1,15 +1,14 @@
 // Панель плеера во весь экран: открывается долгим нажатием на «Сейчас играет» (действие "player")
 // и временно заменяет кнопки страницы — как регулятор громкости (src/mixer.js).
 //
-//   [  ⏮   ] [ Перемешать ] [ обложка ] [   Повтор    ] [  ⏭   ]
-//   [ −10 с ] [   Звук −   ] [    ⏯    ] [   Звук +    ] [ +10 с ]
-//   [ −30 с ] [ Без звука  ] [ Закрыть ] [Открыть плеер] [ +30 с ]
+//   [  ⏮   ] [ Перемешать ] [ обложка ] [ Повтор ] [  ⏭   ]
+//   [ −10 с ] [            ] [    ⏯    ] [        ] [ +10 с ]
+//   [ −30 с ] [            ] [ Закрыть ] [        ] [ +30 с ]
 //
-// По бокам — треки и перемотка, в центре — звук и пауза, сверху — обложка, снизу — «Закрыть».
+// По бокам — треки и перемотка, в центре — пауза, сверху — обложка, снизу — «Закрыть».
 // Что плеер не разрешает менять (перемотку, перемешивание, повтор), показано бледным и не нажимается
 
 const COLOR = '#1db954'
-const SOUND = '#1565c0'
 const NEUTRAL = '#64748b'
 
 const REPEAT_LABELS = { list: 'Повтор: все', track: 'Повтор: трек' }
@@ -47,18 +46,6 @@ export function playerKeys(media) {
     keys[2] = { meter: 'nowPlaying', color: COLOR }
     keys[7] = { label: playing ? 'Пауза' : 'Играть', icon: playing ? 'lucide:pause' : 'lucide:play', color: COLOR, action: { type: 'media', command: 'playpause' } }
 
-    keys[6] = { label: 'Звук −', icon: 'lucide:volume-1', color: SOUND, action: { type: 'volume', step: -5 } }
-    keys[8] = { label: 'Звук +', icon: 'lucide:volume-2', color: SOUND, action: { type: 'volume', step: 5 } }
-    keys[11] = {
-        label: 'Без звука',
-        icon: 'lucide:volume-2',
-        color: SOUND,
-        action: { type: 'mute', target: 'speakers' },
-        toggle: { source: 'speakers', icon: 'lucide:volume-x', color: '#c62828' },
-    }
     keys[12] = { label: 'Закрыть', color: NEUTRAL, icon: 'lucide:x', action: { type: 'mixer' } }
-    keys[13] = m.app
-        ? { label: 'Открыть плеер', icon: 'lucide:app-window', color: NEUTRAL, action: { type: 'media', command: 'open' } }
-        : off('Открыть плеер', 'app-window')
     return keys
 }
