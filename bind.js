@@ -17,6 +17,7 @@ import { startServer } from './src/server.js'
 import { sampleSystem } from './src/system.js'
 import { createTray } from './src/tray.js'
 import { createWeather } from './src/weather.js'
+import { createUpdates } from './src/updates.js'
 import { toRgb565 } from './src/dither.js'
 
 const args = process.argv.slice(2)
@@ -53,6 +54,13 @@ const port = Number(args.find(a => a.startsWith('--port='))?.slice('--port='.len
 const configPath = path.resolve(args.find(a => !a.startsWith('--')) ?? 'config.json')
 const configDir = path.dirname(configPath)
 
+// Первый запуск (скачанный релиз): своего config.json ещё нет — берём стартовый из config.example.json
+const examplePath = path.join(APP_DIR, 'config.example.json')
+if (!fs.existsSync(configPath) && fs.existsSync(examplePath)) {
+    fs.copyFileSync(examplePath, configPath)
+    console.log(`Создан ${configPath} из config.example.json`)
+}
+
 let config, version
 try {
     ({ config, version } = readConfig(configPath))
@@ -74,6 +82,7 @@ let audio = null
 let media = null
 let tray = null
 let weather = null
+let updates = null
 let system = sampleSystem()
 
 // Состояния переключателей, которые меняются нажатием. Запоминаются между запусками
@@ -131,6 +140,7 @@ for (let attempt = 0; ; attempt++) {
             getStatus: status,
             getCover: () => media?.state.cover ?? null,
             onCommand: deviceCommand,
+            getUpdates: () => updates,
         })
         break
     } catch (err) {
@@ -498,6 +508,15 @@ async function press(page, id, key) {
         }
     } else if (action) {
         await runAction(action, id)
+        // Громкость, пока кнопку держат, меняется дальше — как при удержании клавиши на клавиатуре
+        if (REPEATABLE.has(action.type) && pressedKeys.has(id) && !repeaters.has(id)) {
+            const repeat = () => {
+                if (!pressedKeys.has(id)) return repeaters.delete(id)
+                runAction(action, id)
+                repeaters.set(id, setTimeout(repeat, REPEAT_EVERY_MS))
+            }
+            repeaters.set(id, setTimeout(repeat, REPEAT_DELAY_MS))
+        }
     }
     // Переключатель без привязки к Windows меняет состояние при каждом нажатии
     if (key.toggle && (key.toggle.source ?? 'self') === 'self') {
@@ -506,6 +525,17 @@ async function press(page, id, key) {
         web.broadcast('status', status())
         if (currentPage === page && !pressedKeys.has(id)) renderKey(id).catch(() => {})
     }
+}
+
+// Повтор при удержании: первый повтор через REPEAT_DELAY_MS, дальше каждые REPEAT_EVERY_MS
+const REPEATABLE = new Set(['volume'])
+const REPEAT_DELAY_MS = 400
+const REPEAT_EVERY_MS = 100
+const repeaters = new Map() // кнопка → таймер следующего повтора
+
+function stopRepeat(id) {
+    clearTimeout(repeaters.get(id))
+    repeaters.delete(id)
 }
 
 const consumedKeys = new Set() // нажатия, которые только разбудили экран
@@ -572,6 +602,7 @@ device.on('down', ({ id }) => {
 device.on('up', ({ id }) => {
     if (typeof id !== 'number') return
     pressedKeys.delete(id)
+    stopRepeat(id)
     if (consumedKeys.delete(id)) return
     const long = longPresses.get(id)
     if (long) {
@@ -632,6 +663,7 @@ async function stop() {
     shuttingDown = true
     clearTimeout(retryTimer)
     for (const action of held.values()) holdEnd(action)
+    for (const id of [...repeaters.keys()]) stopRepeat(id)
     media?.close()
     tray?.close()
     // Дождаться, пока уйдёт кадр завершения сессии, чтобы следующий запуск подключился сразу
@@ -696,6 +728,16 @@ weather = createWeather({
 })
 weather.setPlace(config.weather)
 
+// Обновления с GitHub: проверка при запуске и раз в 12 часов, установка — из конфигуратора
+updates = createUpdates({
+    onChange: state => {
+        web.broadcast('update', state)
+        tray?.setUpdate(state.available ? state.latest.version : null)
+    },
+    restart: () => restart(),
+    shutdown: () => shutdown(),
+})
+
 // Раз в секунду: загрузка системы, часы, окно ожидания и сон
 setInterval(() => {
     system = sampleSystem()
@@ -712,6 +754,7 @@ if (!args.includes('--no-tray')) {
         onCommand: command => {
             switch (command) {
                 case 'open': return openExternal(web.url)
+                case 'update': return openExternal(`${web.url}#updates`)
                 case 'log': return openExternal(LOG_PATH)
                 case 'idle': return enterIdle()
                 case 'restart': return restart()
@@ -720,6 +763,7 @@ if (!args.includes('--no-tray')) {
         },
     })
     tray.setStatus('ищу устройство…', false)
+    if (updates.state.available) tray.setUpdate(updates.state.latest.version)
 }
 
 console.log(`Конфиг: ${configPath}\nКонфигуратор: ${web.url}\nИщу устройство… (Ctrl+C — выход)`)

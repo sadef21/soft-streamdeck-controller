@@ -1,6 +1,7 @@
 # Значок утилиты в трее: меню, конфигуратор, автозапуск вместе с Windows.
-# Команды пишет в stdout: open, idle, log, restart, quit.
-# Состояние читает из stdin строками «status <текст>|<1 — устройство подключено, 0 — нет>».
+# Команды пишет в stdout: open, idle, update, log, restart, quit.
+# Состояние читает из stdin строками «status <текст>|<1 — устройство подключено, 0 — нет>»
+# и «update <версия>» (пусто — обновлений нет).
 # Закрывается сам, когда утилита закрывает stdin
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -82,6 +83,8 @@ $autostartItem.add_Click({
     $autostartItem.Checked = Test-Path $shortcutPath
 })
 $null = $menu.Items.Add($autostartItem)
+$updateItem = $menu.Items.Add('Проверить обновления')
+$updateItem.add_Click({ Send 'update' })
 $logItem = $menu.Items.Add('Открыть журнал')
 $logItem.add_Click({ Send 'log' })
 $null = $menu.Items.Add('-')
@@ -117,6 +120,17 @@ $timer.add_Tick({
             return
         }
         $script:pending = $stdin.ReadLineAsync()
+        if ($line.StartsWith('update')) {
+            # «update 1.2.0» — вышла новая версия, «update » — обновлений нет
+            $version = $line.Substring(6).Trim()
+            if ($version) {
+                $updateItem.Text = "Доступно обновление $version…"
+                $updateItem.Font = New-Object System.Drawing.Font($updateItem.Font, [System.Drawing.FontStyle]::Bold)
+            } else {
+                $updateItem.Text = 'Проверить обновления'
+                $updateItem.Font = $logItem.Font
+            }
+        }
         if ($line.StartsWith('status ')) {
             $parts = $line.Substring(7).Split('|')
             $statusItem.Text = $parts[0]

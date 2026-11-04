@@ -1,12 +1,14 @@
 {
   "name": "streamx-bind",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Бинды горячих клавиш, программ и макросов для Razer Stream Controller X",
+  "repository": "github:sadef21/soft-streamdeck-controller",
   "type": "module",
   "main": "bind.js",
   "scripts": {
     "start": "node bind.js",
-    "check": "node bind.js --check"
+    "check": "node bind.js --check",
+    "release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1"
   },
   "dependencies": {
     "canvas": "^3.2.3",

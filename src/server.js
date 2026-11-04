@@ -160,7 +160,8 @@ function listBackups(configPath) {
     }
 }
 
-export function startServer({ port, configPath, getStatus, getCover, onCommand }) {
+// getUpdates — модуль обновлений (src/updates.js), создаётся после сервера
+export function startServer({ port, configPath, getStatus, getCover, onCommand, getUpdates }) {
     const configDir = path.dirname(configPath)
     const iconsDir = path.join(configDir, 'icons')
     const hosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`])
@@ -177,6 +178,26 @@ export function startServer({ port, configPath, getStatus, getCover, onCommand }
 
     const routes = {
         'GET /api/meta': () => ({ keyNames: Object.keys(VK), configPath }),
+
+        'GET /api/update': () => getUpdates?.()?.state ?? null,
+        'POST /api/update/check': async () => {
+            const updates = getUpdates?.()
+            if (!updates) throw httpError(503, 'Проверка обновлений ещё не готова')
+            await updates.check()
+            return updates.state
+        },
+        'POST /api/update/install': async () => {
+            const updates = getUpdates?.()
+            if (!updates) throw httpError(503, 'Обновления ещё не готовы')
+            try {
+                // Не ждём: установка закрывает утилиту
+                if (!updates.state.available) throw new Error('Обновлений нет')
+                updates.install()
+            } catch (err) {
+                throw httpError(400, err.message)
+            }
+            return { ok: true }
+        },
 
         'GET /api/config': () => {
             const text = fs.readFileSync(configPath, 'utf8')

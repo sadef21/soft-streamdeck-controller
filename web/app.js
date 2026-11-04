@@ -108,6 +108,7 @@ const state = {
     clipboard: null,
     saving: false,
     calibrating: false, // на устройстве открыта «Подгонка под рамки»
+    update: null, // состояние обновлений с утилиты (src/updates.js)
 }
 
 const $ = id => document.getElementById(id)
@@ -887,7 +888,8 @@ function globalPanel() {
             field('Подгонка под рамки', layoutEditor(),
                 state.calibrating
                     ? 'На устройстве сейчас зелёные рамки. Двигайте их, пока каждая не будет видна в своём окошке одинаково со всех сторон, затем сохраните.'
-                    : 'Если кнопки на устройстве сдвинуты относительно окошек или край обрезан рамкой.')))],
+                    : 'Если кнопки на устройстве сдвинуты относительно окошек или край обрезан рамкой.'))),
+        h('section', { class: 'section', id: 'updates-section' }, h('h3', {}, 'Обновления'), h('div', { id: 'updates' }, updatesView()))],
         tab === 'idle' && [panelHead('Для всех страниц', 'Ожидание и сон'), h('section', { class: 'section' }, idleEditor())],
         tab === 'backups' && [panelHead('Для всех страниц', 'Резервные копии'), h('section', { class: 'section' }, backupsEditor())])
 }
@@ -901,6 +903,87 @@ window.addEventListener('pagehide', () => {
     if (!state.calibrating) return
     navigator.sendBeacon('/api/device', new Blob([JSON.stringify({ command: 'calibrate', layout: null })], { type: 'application/json' }))
 })
+
+/* ---------- Обновления ---------- */
+
+const UPDATE_DATE = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
+
+// Пункт трея «Проверить обновления» открывает конфигуратор с #updates: показать раздел и проверить
+function openUpdatesFromHash() {
+    if (location.hash !== '#updates' || !state.config) return
+    window.history.replaceState(null, '', location.pathname)
+    state.globalTab = 'device'
+    renderGlobalPanel()
+    $('updates-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    checkUpdates()
+}
+window.addEventListener('hashchange', openUpdatesFromHash)
+
+// Перерисовать только раздел обновлений: он меняется по событиям утилиты
+function renderUpdates() {
+    $('updates')?.replaceChildren(updatesView())
+}
+
+async function checkUpdates() {
+    try {
+        state.update = await api('POST', '/api/update/check', {})
+    } catch (err) {
+        toast(err.message, { type: 'error' })
+    }
+    renderUpdates()
+}
+
+async function installUpdate() {
+    const { latest, mode } = state.update
+    const ok = await confirmDialog({
+        title: `Обновить до ${latest.version}?`,
+        text: mode === 'git'
+            ? 'Утилита выполнит git pull и перезапустится.'
+            : 'Утилита скачает новую версию, закроется на несколько секунд и запустится снова. Ваши настройки, иконки и резервные копии останутся.',
+        okLabel: 'Обновить',
+    })
+    if (!ok) return
+    try {
+        await api('POST', '/api/update/install', {})
+        toast('Устанавливаю обновление — утилита перезапустится, страница обновится сама', { timeout: 15000 })
+        // Ждём, пока утилита поднимется с новой версией, и перезагружаем страницу с новым конфигуратором
+        const started = Date.now()
+        const poll = setInterval(async () => {
+            if (Date.now() - started > 120000) return clearInterval(poll)
+            try {
+                const info = await api('GET', '/api/update')
+                if (info && info.current === latest.version) {
+                    clearInterval(poll)
+                    location.reload()
+                }
+            } catch {}
+        }, 2000)
+    } catch (err) {
+        toast(err.message, { type: 'error' })
+    }
+}
+
+function updatesView() {
+    const u = state.update
+    if (!u) return h('p', { class: 'field-hint flush' }, 'Загрузка…')
+    const rows = [h('p', { class: 'field-hint flush' }, `Установлена версия ${u.current}.`)]
+    if (u.checking) rows.push(h('p', { class: 'field-hint flush' }, 'Проверяю…'))
+    else if (u.installing) rows.push(h('p', { class: 'field-hint flush' }, 'Устанавливаю обновление…'))
+    else if (u.error) rows.push(h('p', { class: 'field-hint flush error-text' }, u.error))
+    else if (u.available) {
+        rows.push(h('div', { class: 'update-card' },
+            h('strong', {}, `Доступна версия ${u.latest.version}`),
+            u.latest.published && h('span', { class: 'muted small' }, ` · ${UPDATE_DATE.format(new Date(u.latest.published))}`),
+            u.latest.notes && h('pre', { class: 'update-notes' }, u.latest.notes.trim())))
+    } else if (u.checked) {
+        rows.push(h('p', { class: 'field-hint flush' }, u.latest ? 'Это последняя версия.' : 'На GitHub ещё нет релизов.'))
+    }
+    rows.push(h('div', { class: 'row-actions' },
+        u.available && !u.installing && h('button', { class: 'btn small primary', onclick: installUpdate }, icon('download'), `Обновить до ${u.latest.version}`),
+        h('button', { class: 'btn small', disabled: u.checking || u.installing, onclick: checkUpdates }, icon('refresh-cw'), 'Проверить'),
+        u.latest?.url && h('a', { class: 'btn small ghost', href: u.latest.url, target: '_blank', rel: 'noopener' }, icon('external-link'), 'Релиз на GitHub')))
+    return h('div', { class: 'stack' }, rows)
+}
 
 function sendCalibration(layout) {
     const json = JSON.stringify(layout)
@@ -1878,6 +1961,10 @@ function connectEvents() {
         }
     })
     events.addEventListener('press', e => flashKey(JSON.parse(e.data)))
+    events.addEventListener('update', e => {
+        state.update = JSON.parse(e.data)
+        renderUpdates()
+    })
     events.addEventListener('config', e => onExternalConfig(JSON.parse(e.data).version))
     events.addEventListener('error', () => {
         if (!state.status.online) return
@@ -1948,6 +2035,9 @@ function init() {
             const meta = await api('GET', '/api/meta')
             state.keyNames = new Set(meta.keyNames)
             await load()
+            state.update = await api('GET', '/api/update').catch(() => null)
+            renderUpdates()
+            openUpdatesFromHash()
         } catch (err) {
             $('global-panel').replaceChildren(h('div', { class: 'fatal' }, err.message))
         } finally {
