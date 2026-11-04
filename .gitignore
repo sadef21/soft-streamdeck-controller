@@ -1,0 +1,4 @@
+node_modules/
+bind.log
+state.json
+backups/

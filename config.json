@@ -1,0 +1,84 @@
+{
+  "brightness": 5,
+  "startPage": "main",
+  "pages": {
+    "main": {
+      "0": { "label": "+", "color": "#ec407a", "action": { "type": "volume", "step": 5, "target": "mic" } },
+      "1": { "label": "Предыдущий", "color": "#1db954", "icon": "lucide:skip-back", "action": { "type": "media", "command": "prev" } },
+      "2": { "meter": "nowPlaying", "color": "#1db954", "action": { "type": "media", "command": "playpause" } },
+      "3": { "label": "Следующий", "color": "#1db954", "icon": "lucide:skip-forward", "action": { "type": "media", "command": "next" } },
+      "4": { "label": "+", "color": "#1565c0", "action": { "type": "volume", "step": 5 }, "icon": "lucide:volume-2" },
+      "5": { "label": "−", "color": "#ec407a", "action": { "type": "volume", "step": -5, "target": "mic" } },
+      "6": {
+        "label": "Диспетчер задач",
+        "color": "#00695C",
+        "action": { "type": "hotkey", "keys": "ctrl+shift+esc" },
+        "icon": "lucide:app-window"
+      },
+      "7": { "label": "Скриншот", "color": "#455A64", "action": { "type": "hotkey", "keys": "win+shift+s" }, "icon": "lucide:image" },
+      "8": { "label": "Заблокировать", "color": "#90a4ae", "action": { "type": "system", "command": "lock" } },
+      "9": { "label": "-", "color": "#1565c0", "action": { "type": "volume", "step": -5 }, "icon": "lucide:volume-1" },
+      "10": {
+        "label": "Микрофон",
+        "color": "#ec407a",
+        "icon": "lucide:mic",
+        "action": { "type": "mute", "target": "mic" },
+        "toggle": { "source": "mic", "label": "Микрофон\nвыключен", "icon": "lucide:mic-off", "color": "#c62828" },
+        "meter": "mic"
+      },
+      "14": {
+        "label": "Звук",
+        "color": "#1565c0",
+        "icon": "lucide:volume-2",
+        "action": { "type": "mute", "target": "speakers" },
+        "toggle": { "source": "speakers", "label": "Без звука", "icon": "lucide:volume-x", "color": "#c62828" },
+        "meter": "volume"
+      }
+    },
+    "Ожидание": {
+      "0": { "label": "Микрофон", "meter": "mic", "color": "#ec407a" },
+      "1": { "meter": "netDown", "color": "#00838f", "label": "Загрузка" },
+      "2": { "meter": "nowPlaying", "color": "#1db954" },
+      "3": { "label": "Отдача", "meter": "netUp", "color": "#6a1b9a" },
+      "4": { "label": "Звук", "meter": "volume", "color": "#26a69a" },
+      "5": { "meter": "clock-h1", "color": "#4ade80" },
+      "6": { "meter": "clock-h2", "color": "#4ade80" },
+      "7": { "meter": "clock-colon", "color": "#4ade80" },
+      "8": { "meter": "clock-m1", "color": "#4ade80" },
+      "9": { "meter": "clock-m2", "color": "#4ade80" },
+      "10": { "meter": "cpu", "color": "#b71c1c", "label": "ЦП" },
+      "11": { "meter": "gpu", "color": "#1565c0", "label": "ГП" },
+      "12": { "meter": "weather", "color": "#5c6bc0" },
+      "13": { "meter": "ram", "color": "#2e7d32", "label": "ОЗУ" },
+      "14": { "meter": "disk", "color": "#ef6c00", "label": "Диск" }
+    }
+  },
+  "idle": {
+    "after": 30,
+    "page": "Ожидание"
+  },
+  "sleep": {
+    "after": 10,
+    "brightness": 1
+  },
+  "weather": {
+    "city": "Киев",
+    "latitude": 50.45466,
+    "longitude": 30.5238
+  },
+  "layout": {
+    "columns": [
+      6,
+      103,
+      201,
+      298,
+      395
+    ],
+    "rows": [
+      -1,
+      96,
+      193
+    ]
+  },
+  "keyStyle": "neon"
+}
