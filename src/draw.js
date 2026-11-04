@@ -882,6 +882,15 @@ export function drawKey(ctx, size, {
     const ink = inkColor(style, look, accent)
 
     ctx.save()
+    if (pressed) {
+        // Нажатие — «вдавливание»: кнопка целиком чуть уменьшается к центру, вокруг чёрное поле.
+        // Долгое нажатие вдавливается глубже
+        const k = pressed === 'long' ? 0.88 : 0.92
+        ctx.fillStyle = '#000000'
+        ctx.fillRect(0, 0, size, size)
+        ctx.translate((size * (1 - k)) / 2, (size * (1 - k)) / 2)
+        ctx.scale(k, k)
+    }
     if (rounded) {
         // За скруглёнными углами — чёрный, как корпус вокруг клавиши
         ctx.fillStyle = '#000000'
@@ -921,17 +930,14 @@ export function drawKey(ctx, size, {
     if (on !== null) drawLed(ctx, size, on, style, ink)
     if (look.longPress) drawLongPressMark(ctx, size, style, ink)
 
-    // Подсветка нажатия. Рамка идёт по границе содержимого, иначе её закроет рамка клавиши.
-    // pressed === 'long' — сработало долгое нажатие
+    // Вдавленная кнопка темнее. pressed === 'long' — сработало долгое нажатие: ещё и оттенок цвета кнопки
     if (pressed) {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)'
         ctx.fillRect(0, 0, size, size)
-        const inset = offset + 2
-        ctx.strokeStyle = pressed === 'long' ? accent : '#ffffff'
-        ctx.lineWidth = pressed === 'long' ? 4 : 3
-        ctx.beginPath()
-        roundRectPath(ctx, inset, inset, size - inset * 2, size - inset * 2, Math.max(0, radius - inset / 2))
-        ctx.stroke()
+        if (pressed === 'long') {
+            ctx.fillStyle = withAlpha(accent, 0.22)
+            ctx.fillRect(0, 0, size, size)
+        }
     }
     ctx.restore()
 }
