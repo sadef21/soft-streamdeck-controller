@@ -36,11 +36,13 @@ const ACTIONS = {
     page: { label: 'Страница', icon: 'layers' },
     volume: { label: 'Громкость', icon: 'volume-2' },
     mute: { label: 'Без звука', icon: 'volume-x' },
+    mixer: { label: 'Регулятор', icon: 'sliders-horizontal' },
+    volumeSet: { label: 'Уровень', icon: 'gauge' },
     media: { label: 'Музыка', icon: 'music' },
     system: { label: 'Компьютер', icon: 'lock' },
     delay: { label: 'Пауза', icon: 'hourglass' },
 }
-const KEY_ACTIONS = ['hotkey', 'text', 'run', 'open', 'macro', 'page', 'volume', 'mute', 'media', 'system']
+const KEY_ACTIONS = ['hotkey', 'text', 'run', 'open', 'macro', 'page', 'volume', 'mute', 'mixer', 'media', 'system']
 const STEP_ACTIONS = ['hotkey', 'text', 'delay', 'run', 'open', 'page', 'volume', 'mute', 'media', 'system']
 const SYSTEM_COMMANDS = [['lock', 'Заблокировать (как Win+L)']]
 const MEDIA_COMMANDS = [['playpause', 'Пауза / продолжить'], ['next', 'Следующий трек'], ['prev', 'Предыдущий трек']]
@@ -231,6 +233,8 @@ function defaultAction(type) {
         case 'page': return { type, page: pageNames().find(name => name !== state.page) ?? 'back' }
         case 'volume': return { type, step: 5 }
         case 'mute': return { type, target: 'speakers' }
+        case 'mixer': return { type, target: 'speakers' }
+        case 'volumeSet': return { type, target: 'speakers', value: 50 }
         case 'media': return { type, command: 'playpause' }
         case 'system': return { type, command: 'lock' }
         case 'delay': return { type, ms: 200 }
@@ -1581,6 +1585,8 @@ function actionBody(action, { inMacro = false, key = null, allowHold = !inMacro 
         case 'page': return pageEditor(action)
         case 'volume': return volumeEditor(action, key)
         case 'mute': return muteEditor(action, key)
+        case 'mixer': return mixerEditor(action)
+        case 'volumeSet': return volumeSetEditor(action)
         case 'media': return mediaEditor(action)
         case 'system': return systemEditor(action)
         case 'delay': return delayEditor(action)
@@ -1641,6 +1647,36 @@ function systemEditor(action) {
         action.command = value
         changed()
     }), 'Сочетание Win+L, отправленное программой, Windows игнорирует, поэтому блокировка — отдельная команда.')
+}
+
+function mixerEditor(action) {
+    return h('div', { class: 'stack' },
+        field('Чем управлять', selectBox(MUTE_TARGETS, action.target ?? 'speakers', value => {
+            action.target = value
+            changed()
+        })),
+        h('p', { class: 'field-hint flush' }, 'Кнопки устройства на время превращаются в регулятор: по бокам −/+ с шагом 1, 5 и 10, '
+            + 'в центре 0, 25, 50, 75 и 100%, сверху уровень, снизу «Закрыть». Сам закрывается через 5 секунд без нажатий. '
+            + 'Удобно повесить на долгое нажатие кнопки звука или микрофона.'))
+}
+
+function volumeSetEditor(action) {
+    return h('div', { class: 'stack' },
+        field('Чей уровень', selectBox(MUTE_TARGETS, action.target ?? 'speakers', value => {
+            action.target = value
+            changed()
+        })),
+        field('Уровень, %', h('input', {
+            type: 'number',
+            class: 'num',
+            min: 0,
+            max: 100,
+            value: action.value ?? 50,
+            oninput: e => {
+                action.value = Math.min(100, Math.max(0, Math.round(Number(e.target.value) || 0)))
+                changed()
+            },
+        })))
 }
 
 function muteEditor(action, key) {

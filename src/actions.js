@@ -39,7 +39,7 @@ function audioOf(ctx) {
     return ctx.audio
 }
 
-// ctx: { switchPage(name), audio } — то, что действию нужно от основного цикла
+// ctx: { switchPage(name), openMixer(target), audio, media } — то, что действию нужно от основного цикла
 export async function execute(action, ctx) {
     switch (action.type) {
         case 'hotkey': return tapCombo(action.keys)
@@ -49,6 +49,16 @@ export async function execute(action, ctx) {
         case 'delay': return sleep(action.ms)
         case 'page': return ctx.switchPage(action.page)
         case 'volume': return audioOf(ctx).changeVolume(action.target ?? 'speakers', action.step)
+        case 'volumeSet': {
+            // Точный уровень (пресеты регулятора). Ненулевой уровень включает звук, как прибавление громкости
+            const audio = audioOf(ctx)
+            const target = action.target ?? 'speakers'
+            audio.setVolume(target, action.value)
+            if (action.value > 0 && audio.state[target]?.muted) audio.setMute(target, false)
+            return
+        }
+        // Регулятор громкости во весь экран (bind.js); target: null — закрыть
+        case 'mixer': return ctx.openMixer(action.target ?? null)
         case 'mute': return audioOf(ctx).toggleMute(action.target ?? 'speakers')
         case 'media':
             if (!ctx.media) throw new Error('управление плеером недоступно')
@@ -111,6 +121,13 @@ export function validate(action, where, pages) {
             }
             break
         case 'mute':
+        case 'mixer':
+            if (action.target !== undefined && action.target !== 'speakers' && action.target !== 'mic') {
+                fail('"target" должен быть "speakers" (звук) или "mic" (микрофон)')
+            }
+            break
+        case 'volumeSet':
+            if (typeof action.value !== 'number' || action.value < 0 || action.value > 100) fail('у "volumeSet" должно быть поле "value" от 0 до 100')
             if (action.target !== undefined && action.target !== 'speakers' && action.target !== 'mic') {
                 fail('"target" должен быть "speakers" (звук) или "mic" (микрофон)')
             }

@@ -18,6 +18,7 @@ import { sampleSystem } from './src/system.js'
 import { createTray } from './src/tray.js'
 import { createWeather } from './src/weather.js'
 import { createUpdates } from './src/updates.js'
+import { MIXER_TIMEOUT_MS, mixerKeys } from './src/mixer.js'
 import { toRgb565 } from './src/dither.js'
 
 const args = process.argv.slice(2)
@@ -126,6 +127,7 @@ const status = () => ({
     toggles,
     ...currentSources(),
     idle: idleActive,
+    mixer: mixer?.target ?? null,
     asleep,
 })
 
@@ -255,6 +257,39 @@ function toggleState(page, index, key) {
 
 const viewOf = (page, index, key, on = toggleState(page, index, key)) => keyView(key, { on, sources: currentSources() })
 
+// Регулятор громкости (src/mixer.js): пока открыт, на экране его кнопки вместо кнопок страницы
+let mixer = null // { target: 'speakers' | 'mic' }
+let mixerTimer = null
+
+// Кнопки, которые сейчас на экране
+const visibleKeys = () => (mixer ? mixerKeys(mixer.target, audio?.state[mixer.target]) : config.pages[currentPage])
+
+// Закрыть регулятор, если его не трогали MIXER_TIMEOUT_MS. Пока кнопку держат (повтор громкости) — не закрываем
+function touchMixer() {
+    clearTimeout(mixerTimer)
+    if (!mixer) return
+    mixerTimer = setTimeout(() => {
+        if (pressedKeys.size) touchMixer()
+        else openMixer(null)
+    }, MIXER_TIMEOUT_MS)
+}
+
+// target — открыть регулятор (или переключить его на звук/микрофон), null — закрыть
+function openMixer(target) {
+    if (!target && !mixer) return
+    mixer = target ? { target } : null
+    touchMixer()
+    console.log(target ? `Регулятор: ${target === 'mic' ? 'микрофон' : 'звук'}` : 'Регулятор закрыт')
+    web.broadcast('status', status())
+    if (connected) renderPage()
+}
+
+// Смена страницы, окно ожидания и перезагрузка конфига закрывают регулятор без перерисовки — её сделают они сами
+function dropMixer() {
+    clearTimeout(mixerTimer)
+    mixer = null
+}
+
 let labelSizes = null
 const rendered = new Map() // кнопка → как она нарисована сейчас, чтобы не перерисовывать без изменений
 const pressedKeys = new Set()
@@ -263,7 +298,7 @@ let cover = { id: null, image: null }
 // Один размер подписей на странице. У переключателей учитываем подписи обоих состояний
 function measureCurrentPage() {
     const views = []
-    for (const [index, key] of Object.entries(config.pages[currentPage])) {
+    for (const [index, key] of Object.entries(visibleKeys())) {
         const on = toggleState(currentPage, Number(index), key)
         views.push(viewOf(currentPage, Number(index), key, on))
         if (key.toggle) views.push(viewOf(currentPage, Number(index), key, !on))
@@ -290,7 +325,7 @@ const signatureOf = view => JSON.stringify([view.look, view.meter, view.on, view
 async function renderKey(index, pressed = false) {
     if (calibration) return
     const style = config.keyStyle ?? DEFAULT_STYLE
-    const key = config.pages[currentPage][index] ?? {}
+    const key = visibleKeys()[index] ?? {}
     const view = viewOf(currentPage, index, key)
     const image = await imageFor(view.icon, view.look, style)
     if (calibration) return
@@ -318,7 +353,7 @@ async function renderKey(index, pressed = false) {
 
 // Перерисовать кнопку, только если её вид изменился: индикаторы обновляются каждую секунду
 function refreshKey(index) {
-    const key = config.pages[currentPage][index]
+    const key = visibleKeys()[index]
     if (!key || pressedKeys.has(index)) return
     if (rendered.get(index) === signatureOf(viewOf(currentPage, index, key))) return
     renderKey(index).catch(() => {})
@@ -326,7 +361,7 @@ function refreshKey(index) {
 
 function refreshKeys(filter) {
     if (!connected || (asleep && !(config.sleep?.brightness > 0))) return
-    for (const [index, key] of Object.entries(config.pages[currentPage])) {
+    for (const [index, key] of Object.entries(visibleKeys())) {
         if (filter(key)) refreshKey(Number(index))
     }
 }
@@ -413,6 +448,7 @@ async function renderPage() {
 }
 
 function switchPage(name) {
+    dropMixer()
     if (name === 'back') {
         if (!pageHistory.length) return
         currentPage = pageHistory.pop()
@@ -436,6 +472,7 @@ function enterIdle() {
     const page = config.idle?.page
     if (!config.pages[page]) return false
     if (idleActive) return true
+    dropMixer()
     idleActive = true
     pageBeforeIdle = currentPage
     currentPage = page
@@ -480,6 +517,7 @@ function checkIdle() {
 
 const actionContext = {
     switchPage,
+    openMixer,
     get audio() { return audio },
     get media() { return media },
 }
@@ -578,7 +616,8 @@ device.on('down', ({ id }) => {
         return
     }
     const page = currentPage
-    const key = config.pages[page][id]
+    const key = visibleKeys()[id]
+    touchMixer()
     console.log(`Кнопка ${id}${key?.label ? ` (${key.label.replace(/\n/g, ' ')})` : ''}`)
     pressedKeys.add(id)
     web.broadcast('press', { key: id, page })
@@ -631,6 +670,7 @@ fs.watch(configPath, () => {
             ;({ config, version } = loaded)
             // Сохранили — подгонка закончена. Если раскладка сменилась, стираем кнопки на старых местах
             clearTimeout(calibrationTimer)
+            dropMixer()
             const wasCalibrating = !!calibration
             calibration = null
             clearIconCache()
@@ -706,7 +746,8 @@ try {
     audio = createAudio({
         onChange: () => {
             web.broadcast('status', status())
-            refreshKeys(isAudioKey)
+            // В регуляторе от громкости зависит и подсветка пресетов
+            refreshKeys(key => isAudioKey(key) || !!mixer)
         },
     })
 } catch (err) {

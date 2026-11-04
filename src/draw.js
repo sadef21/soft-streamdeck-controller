@@ -213,6 +213,8 @@ function autoIcon(action, on) {
         case 'mute':
             if (action.target === 'mic') return on ? 'mic-off' : 'mic'
             return on ? 'volume-x' : 'volume-2'
+        case 'mixer': return action.target ? 'sliders-horizontal' : 'x'
+        case 'volumeSet': return 'gauge'
         default: return null
     }
 }
