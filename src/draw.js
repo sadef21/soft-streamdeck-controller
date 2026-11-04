@@ -209,11 +209,14 @@ function autoIcon(action, on) {
             return action.step > 0 ? 'volume-2' : 'volume-1'
         case 'system': return 'lock'
         // Те же значки, что у медиаклавиш в сочетаниях
-        case 'media': return { playpause: 'play', next: 'skip-forward', prev: 'skip-back' }[action.command] ?? 'music'
+        case 'media':
+            if (action.command === 'seek') return action.seconds < 0 ? 'rewind' : 'fast-forward'
+            return { playpause: 'play', next: 'skip-forward', prev: 'skip-back', shuffle: 'shuffle', repeat: 'repeat', open: 'app-window' }[action.command] ?? 'music'
         case 'mute':
             if (action.target === 'mic') return on ? 'mic-off' : 'mic'
             return on ? 'volume-x' : 'volume-2'
         case 'mixer': return action.target ? 'sliders-horizontal' : 'x'
+        case 'player': return 'disc-3'
         case 'volumeSet': return 'gauge'
         default: return null
     }
@@ -914,6 +917,8 @@ export function drawKey(ctx, size, {
         ctx.save()
         ctx.translate(offset, offset)
         ctx.scale(scale, scale)
+        // disabled — кнопка панели, которую сейчас нельзя нажать (плеер не поддерживает): бледная
+        if (look.disabled) ctx.globalAlpha = 0.3
         const mode = labelMode(view)
         const label = mode ? look.label : null
         if (meter?.kind === 'ring') drawRing(ctx, size, meter, image, style, ink, textColor, compact)

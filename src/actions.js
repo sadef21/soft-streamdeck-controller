@@ -34,12 +34,22 @@ function run({ path: file, args = [], cwd }) {
     open(file)
 }
 
+// Вывести окно плеера: Spotify — по своей ссылке, остальные — по идентификатору приложения Windows
+function openPlayer(app) {
+    if (!app) throw new Error('сейчас ничего не играет')
+    if (/spotify/i.test(app)) return open('spotify:')
+    open(`shell:AppsFolder\\${app}`)
+}
+
 function audioOf(ctx) {
     if (!ctx.audio) throw new Error('управление громкостью недоступно')
     return ctx.audio
 }
 
-// ctx: { switchPage(name), openMixer(target), audio, media } — то, что действию нужно от основного цикла
+// open — вывести окно плеера, seek — перемотать на seconds (минус — назад)
+const MEDIA_COMMANDS = ['playpause', 'next', 'prev', 'seek', 'shuffle', 'repeat', 'open']
+
+// ctx: { switchPage(name), openPanel(panel), audio, media } — то, что действию нужно от основного цикла
 export async function execute(action, ctx) {
     switch (action.type) {
         case 'hotkey': return tapCombo(action.keys)
@@ -57,12 +67,15 @@ export async function execute(action, ctx) {
             if (action.value > 0 && audio.state[target]?.muted) audio.setMute(target, false)
             return
         }
-        // Регулятор громкости во весь экран (bind.js); target: null — закрыть
-        case 'mixer': return ctx.openMixer(action.target ?? null)
+        // Регулятор громкости во весь экран (bind.js); без target — закрыть открытую панель
+        case 'mixer': return ctx.openPanel(action.target ? { kind: 'volume', target: action.target } : null)
         case 'mute': return audioOf(ctx).toggleMute(action.target ?? 'speakers')
         case 'media':
             if (!ctx.media) throw new Error('управление плеером недоступно')
+            if (action.command === 'seek') return ctx.media.command(`seek ${action.seconds}`)
+            if (action.command === 'open') return openPlayer(ctx.media.state.media?.app)
             return ctx.media.command(action.command)
+        case 'player': return ctx.openPanel({ kind: 'player' })
         case 'system': return systemCommand(action.command)
         case 'macro':
             for (const step of action.steps) {
@@ -133,9 +146,14 @@ export function validate(action, where, pages) {
             }
             break
         case 'media':
-            if (!['playpause', 'next', 'prev'].includes(action.command)) {
-                fail('"command" должен быть "playpause", "next" или "prev"')
+            if (!MEDIA_COMMANDS.includes(action.command)) {
+                fail(`"command" должен быть одним из: ${MEDIA_COMMANDS.map(c => `"${c}"`).join(', ')}`)
             }
+            if (action.command === 'seek' && !(typeof action.seconds === 'number' && action.seconds)) {
+                fail('у перемотки ("seek") должно быть поле "seconds", например 10 или -10')
+            }
+            break
+        case 'player':
             break
         case 'system':
             if (action.command !== 'lock') fail('"command" должен быть "lock" (заблокировать компьютер)')

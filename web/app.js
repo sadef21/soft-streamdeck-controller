@@ -37,15 +37,17 @@ const ACTIONS = {
     volume: { label: 'Громкость', icon: 'volume-2' },
     mute: { label: 'Без звука', icon: 'volume-x' },
     mixer: { label: 'Регулятор', icon: 'sliders-horizontal' },
+    player: { label: 'Плеер', icon: 'disc-3' },
     volumeSet: { label: 'Уровень', icon: 'gauge' },
     media: { label: 'Музыка', icon: 'music' },
     system: { label: 'Компьютер', icon: 'lock' },
     delay: { label: 'Пауза', icon: 'hourglass' },
 }
-const KEY_ACTIONS = ['hotkey', 'text', 'run', 'open', 'macro', 'page', 'volume', 'mute', 'mixer', 'media', 'system']
+const KEY_ACTIONS = ['hotkey', 'text', 'run', 'open', 'macro', 'page', 'volume', 'mute', 'mixer', 'media', 'player', 'system']
 const STEP_ACTIONS = ['hotkey', 'text', 'delay', 'run', 'open', 'page', 'volume', 'mute', 'media', 'system']
 const SYSTEM_COMMANDS = [['lock', 'Заблокировать (как Win+L)']]
-const MEDIA_COMMANDS = [['playpause', 'Пауза / продолжить'], ['next', 'Следующий трек'], ['prev', 'Предыдущий трек']]
+const MEDIA_COMMANDS = [['playpause', 'Пауза / продолжить'], ['next', 'Следующий трек'], ['prev', 'Предыдущий трек'],
+    ['seek', 'Перемотать'], ['shuffle', 'Перемешивание вкл / выкл'], ['repeat', 'Повтор: нет → все → трек'], ['open', 'Открыть окно плеера']]
 
 // Индикаторы на кнопке (поле meter)
 const METER_GROUPS = [
@@ -234,6 +236,7 @@ function defaultAction(type) {
         case 'volume': return { type, step: 5 }
         case 'mute': return { type, target: 'speakers' }
         case 'mixer': return { type, target: 'speakers' }
+        case 'player': return { type }
         case 'volumeSet': return { type, target: 'speakers', value: 50 }
         case 'media': return { type, command: 'playpause' }
         case 'system': return { type, command: 'lock' }
@@ -1586,6 +1589,10 @@ function actionBody(action, { inMacro = false, key = null, allowHold = !inMacro 
         case 'volume': return volumeEditor(action, key)
         case 'mute': return muteEditor(action, key)
         case 'mixer': return mixerEditor(action)
+        case 'player': return h('p', { class: 'field-hint flush' }, 'Кнопки устройства на время превращаются в пульт плеера: '
+            + 'по бокам треки и перемотка на 10 и 30 с, в центре звук и пауза, сверху обложка, перемешивание и повтор, '
+            + 'снизу «Закрыть» и «Открыть плеер». Сам закрывается через 5 секунд без нажатий. '
+            + 'Удобно повесить на долгое нажатие кнопки «Сейчас играет».')
         case 'volumeSet': return volumeSetEditor(action)
         case 'media': return mediaEditor(action)
         case 'system': return systemEditor(action)
@@ -1636,10 +1643,28 @@ function volumeEditor(action, key) {
 }
 
 function mediaEditor(action) {
-    return field('Команда плееру', selectBox(MEDIA_COMMANDS, action.command, value => {
-        action.command = value
-        changed()
-    }), 'Уходит в Spotify, если он запущен, иначе в плеер, который играет сейчас: браузер, YouTube, медиаплеер.')
+    const box = h('div', { class: 'stack' })
+    const render = () => box.replaceChildren(
+        field('Команда плееру', selectBox(MEDIA_COMMANDS, action.command, value => {
+            action.command = value
+            if (value === 'seek') action.seconds ??= 10
+            else delete action.seconds
+            changed()
+            render()
+        }), 'Уходит в Spotify, если он запущен, иначе в плеер, который играет сейчас: браузер, YouTube, медиаплеер. '
+            + 'Перемотку, перемешивание и повтор поддерживают не все плееры.'),
+        action.command === 'seek' && field('На сколько секунд', h('input', {
+            type: 'number',
+            class: 'num',
+            step: 5,
+            value: action.seconds ?? 10,
+            oninput: e => {
+                action.seconds = Math.round(Number(e.target.value)) || 10
+                changed()
+            },
+        }), 'Минус — назад, например −10.'))
+    render()
+    return box
 }
 
 function systemEditor(action) {

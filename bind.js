@@ -19,6 +19,7 @@ import { createTray } from './src/tray.js'
 import { createWeather } from './src/weather.js'
 import { createUpdates } from './src/updates.js'
 import { MIXER_TIMEOUT_MS, mixerKeys } from './src/mixer.js'
+import { playerKeys } from './src/player.js'
 import { toRgb565 } from './src/dither.js'
 
 const args = process.argv.slice(2)
@@ -127,7 +128,7 @@ const status = () => ({
     toggles,
     ...currentSources(),
     idle: idleActive,
-    mixer: mixer?.target ?? null,
+    panel: panel ? (panel.kind === 'player' ? 'player' : panel.target) : null,
     asleep,
 })
 
@@ -252,42 +253,53 @@ async function connectDevice() {
 function toggleState(page, index, key) {
     if (!key?.toggle) return null
     const source = key.toggle.source ?? 'self'
-    return source === 'self' ? !!toggles[toggleId(page, index)] : !!audio?.state[source]?.muted
+    if (source === 'self') return !!toggles[toggleId(page, index)]
+    // Перемешивание и повтор плеера — только в панели плеера (src/player.js)
+    if (source === 'shuffle') return !!media?.state.media?.shuffle
+    if (source === 'repeat') return !!media?.state.media?.repeat && media.state.media.repeat !== 'none'
+    return !!audio?.state[source]?.muted
 }
 
 const viewOf = (page, index, key, on = toggleState(page, index, key)) => keyView(key, { on, sources: currentSources() })
 
-// Регулятор громкости (src/mixer.js): пока открыт, на экране его кнопки вместо кнопок страницы
-let mixer = null // { target: 'speakers' | 'mic' }
-let mixerTimer = null
+// Панели во весь экран: регулятор громкости (src/mixer.js) и плеер (src/player.js).
+// Пока панель открыта, на экране её кнопки вместо кнопок страницы
+let panel = null // { kind: 'volume', target: 'speakers' | 'mic' } | { kind: 'player' }
+let panelTimer = null
+
+const panelName = p => (p.kind === 'player' ? 'плеер' : `регулятор (${p.target === 'mic' ? 'микрофон' : 'звук'})`)
 
 // Кнопки, которые сейчас на экране
-const visibleKeys = () => (mixer ? mixerKeys(mixer.target, audio?.state[mixer.target]) : config.pages[currentPage])
+function visibleKeys() {
+    if (panel?.kind === 'volume') return mixerKeys(panel.target, audio?.state[panel.target])
+    if (panel?.kind === 'player') return playerKeys(media?.state.media)
+    return config.pages[currentPage]
+}
 
-// Закрыть регулятор, если его не трогали MIXER_TIMEOUT_MS. Пока кнопку держат (повтор громкости) — не закрываем
-function touchMixer() {
-    clearTimeout(mixerTimer)
-    if (!mixer) return
-    mixerTimer = setTimeout(() => {
-        if (pressedKeys.size) touchMixer()
-        else openMixer(null)
+// Закрыть панель, если её не трогали MIXER_TIMEOUT_MS. Пока кнопку держат (повтор громкости) — не закрываем
+function touchPanel() {
+    clearTimeout(panelTimer)
+    if (!panel) return
+    panelTimer = setTimeout(() => {
+        if (pressedKeys.size) touchPanel()
+        else openPanel(null)
     }, MIXER_TIMEOUT_MS)
 }
 
-// target — открыть регулятор (или переключить его на звук/микрофон), null — закрыть
-function openMixer(target) {
-    if (!target && !mixer) return
-    mixer = target ? { target } : null
-    touchMixer()
-    console.log(target ? `Регулятор: ${target === 'mic' ? 'микрофон' : 'звук'}` : 'Регулятор закрыт')
+// next — открыть панель (или переключить на другую), null — закрыть
+function openPanel(next) {
+    if (!next && !panel) return
+    console.log(next ? `Панель: ${panelName(next)}` : 'Панель закрыта')
+    panel = next
+    touchPanel()
     web.broadcast('status', status())
     if (connected) renderPage()
 }
 
-// Смена страницы, окно ожидания и перезагрузка конфига закрывают регулятор без перерисовки — её сделают они сами
-function dropMixer() {
-    clearTimeout(mixerTimer)
-    mixer = null
+// Смена страницы, окно ожидания и перезагрузка конфига закрывают панель без перерисовки — её сделают они сами
+function dropPanel() {
+    clearTimeout(panelTimer)
+    panel = null
 }
 
 let labelSizes = null
@@ -448,7 +460,7 @@ async function renderPage() {
 }
 
 function switchPage(name) {
-    dropMixer()
+    dropPanel()
     if (name === 'back') {
         if (!pageHistory.length) return
         currentPage = pageHistory.pop()
@@ -472,7 +484,7 @@ function enterIdle() {
     const page = config.idle?.page
     if (!config.pages[page]) return false
     if (idleActive) return true
-    dropMixer()
+    dropPanel()
     idleActive = true
     pageBeforeIdle = currentPage
     currentPage = page
@@ -517,7 +529,7 @@ function checkIdle() {
 
 const actionContext = {
     switchPage,
-    openMixer,
+    openPanel,
     get audio() { return audio },
     get media() { return media },
 }
@@ -617,7 +629,7 @@ device.on('down', ({ id }) => {
     }
     const page = currentPage
     const key = visibleKeys()[id]
-    touchMixer()
+    touchPanel()
     console.log(`Кнопка ${id}${key?.label ? ` (${key.label.replace(/\n/g, ' ')})` : ''}`)
     pressedKeys.add(id)
     web.broadcast('press', { key: id, page })
@@ -670,7 +682,7 @@ fs.watch(configPath, () => {
             ;({ config, version } = loaded)
             // Сохранили — подгонка закончена. Если раскладка сменилась, стираем кнопки на старых местах
             clearTimeout(calibrationTimer)
-            dropMixer()
+            dropPanel()
             const wasCalibrating = !!calibration
             calibration = null
             clearIconCache()
@@ -747,7 +759,7 @@ try {
         onChange: () => {
             web.broadcast('status', status())
             // В регуляторе от громкости зависит и подсветка пресетов
-            refreshKeys(key => isAudioKey(key) || !!mixer)
+            refreshKeys(key => isAudioKey(key) || !!panel)
         },
     })
 } catch (err) {
@@ -757,7 +769,8 @@ try {
 media = createMedia({
     onChange: () => {
         web.broadcast('status', status())
-        refreshKeys(key => key.meter === 'nowPlaying')
+        // В панели плеера от его состояния зависят пауза, перемешивание и повтор
+        refreshKeys(key => key.meter === 'nowPlaying' || panel?.kind === 'player')
     },
 })
 

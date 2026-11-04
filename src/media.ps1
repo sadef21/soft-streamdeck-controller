@@ -1,5 +1,5 @@
 # Помощник утилиты: что сейчас играет (Spotify, иначе текущий плеер Windows), трафик сети и загрузка видеокарты.
-# Пишет строки JSON в stdout. Команды читает из stdin: playpause, next, prev, ping.
+# Пишет строки JSON в stdout. Команды читает из stdin: playpause, next, prev, seek <секунды>, shuffle, repeat, ping.
 # Закрывается сам, когда утилита закрывает stdin
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -18,6 +18,7 @@ function Await($operation, [Type]$type) {
 }
 
 $null = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType = WindowsRuntime]
+$null = [Windows.Media.MediaPlaybackAutoRepeatMode, Windows.Media, ContentType = WindowsRuntime]
 $null = [Windows.Storage.Streams.IRandomAccessStreamWithContentType, Windows.Storage.Streams, ContentType = WindowsRuntime]
 $null = [Windows.Storage.Streams.IInputStream, Windows.Storage.Streams, ContentType = WindowsRuntime]
 $ManagerType = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]
@@ -68,16 +69,24 @@ function Update-Media {
     } else {
         $properties = Await ($session.TryGetMediaPropertiesAsync()) $PropertiesType
         $timeline = $session.GetTimelineProperties()
+        $playback = $session.GetPlaybackInfo()
+        $controls = $playback.Controls
         $state = [ordered]@{
             type     = 'media'
             app      = $session.SourceAppUserModelId
             title    = $properties.Title
             artist   = $properties.Artist
             album    = $properties.AlbumTitle
-            status   = $session.GetPlaybackInfo().PlaybackStatus.ToString().ToLower()
+            status   = $playback.PlaybackStatus.ToString().ToLower()
             position = [math]::Round($timeline.Position.TotalSeconds, 1)
             duration = [math]::Round($timeline.EndTime.TotalSeconds, 1)
             updated  = $timeline.LastUpdatedTime.ToUnixTimeMilliseconds()
+            # Что плеер разрешает менять извне — не все плееры дают перематывать и перемешивать
+            canSeek    = [bool]$controls.IsPlaybackPositionEnabled
+            canShuffle = [bool]$controls.IsShuffleEnabled
+            canRepeat  = [bool]$controls.IsRepeatEnabled
+            shuffle    = if ($null -ne $playback.IsShuffleActive) { [bool]$playback.IsShuffleActive } else { $null }
+            repeat     = if ($null -ne $playback.AutoRepeatMode) { $playback.AutoRepeatMode.ToString().ToLower() } else { $null }
         }
         # Обложку отправляем только при смене трека
         $track = "$($state.app)|$($state.title)|$($state.artist)"
@@ -140,10 +149,30 @@ function Invoke-MediaCommand([string]$command) {
     }
     $session = Get-Session
     if (-not $session) { return }
-    switch ($command) {
+    $name, $argument = $command -split ' ', 2
+    switch ($name) {
         'playpause' { $null = Await ($session.TryTogglePlayPauseAsync()) ([bool]) }
         'next' { $null = Await ($session.TrySkipNextAsync()) ([bool]) }
         'prev' { $null = Await ($session.TrySkipPreviousAsync()) ([bool]) }
+        'seek' {
+            # «seek -10» — на 10 с назад. Позиция плеера обновляется не постоянно: досчитываем,
+            # сколько прошло с последнего обновления, если трек играет
+            $timeline = $session.GetTimelineProperties()
+            $position = $timeline.Position.TotalSeconds
+            if ($session.GetPlaybackInfo().PlaybackStatus.ToString() -eq 'Playing') {
+                $position += ([DateTimeOffset]::UtcNow - $timeline.LastUpdatedTime).TotalSeconds
+            }
+            $target = [math]::Max(0, [math]::Min($timeline.EndTime.TotalSeconds, $position + [double]$argument))
+            $null = Await ($session.TryChangePlaybackPositionAsync([long]($target * 10000000))) ([bool])
+        }
+        'shuffle' {
+            $null = Await ($session.TryChangeShuffleActiveAsync(-not [bool]$session.GetPlaybackInfo().IsShuffleActive)) ([bool])
+        }
+        'repeat' {
+            # Нет повтора → весь список → один трек → нет повтора
+            $next = switch ($session.GetPlaybackInfo().AutoRepeatMode.ToString()) { 'None' { 'List' } 'List' { 'Track' } default { 'None' } }
+            $null = Await ($session.TryChangeAutoRepeatModeAsync([Windows.Media.MediaPlaybackAutoRepeatMode]$next)) ([bool])
+        }
     }
 }
 
