@@ -39,12 +39,13 @@ const ACTIONS = {
     mixer: { label: 'Регулятор', icon: 'sliders-horizontal' },
     player: { label: 'Плеер', icon: 'disc-3' },
     idle: { label: 'Ожидание', icon: 'moon' },
+    pin: { label: 'Закрепить', icon: 'lock' },
     volumeSet: { label: 'Уровень', icon: 'gauge' },
     media: { label: 'Музыка', icon: 'music' },
     system: { label: 'Компьютер', icon: 'lock' },
     delay: { label: 'Пауза', icon: 'hourglass' },
 }
-const KEY_ACTIONS = ['hotkey', 'text', 'run', 'open', 'macro', 'page', 'volume', 'mute', 'mixer', 'media', 'player', 'idle', 'system']
+const KEY_ACTIONS = ['hotkey', 'text', 'run', 'open', 'macro', 'page', 'volume', 'mute', 'mixer', 'media', 'player', 'idle', 'pin', 'system']
 const STEP_ACTIONS = ['hotkey', 'text', 'delay', 'run', 'open', 'page', 'volume', 'mute', 'media', 'system']
 const SYSTEM_COMMANDS = [['lock', 'Заблокировать (как Win+L)']]
 const MEDIA_COMMANDS = [['playpause', 'Пауза / продолжить'], ['next', 'Следующий трек'], ['prev', 'Предыдущий трек'],
@@ -96,6 +97,7 @@ const TOGGLE_SOURCES = [
     ['self', 'Переключается при каждом нажатии'],
     ['speakers', 'Звук Windows выключен'],
     ['mic', 'Микрофон Windows выключен'],
+    ['pin', 'Экран закреплён'],
 ]
 const MUTE_TARGETS = [['speakers', 'Звук (динамики)'], ['mic', 'Микрофон']]
 
@@ -239,6 +241,7 @@ function defaultAction(type) {
         case 'mixer': return { type, target: 'speakers' }
         case 'player': return { type }
         case 'idle': return { type }
+        case 'pin': return { type }
         case 'volumeSet': return { type, target: 'speakers', value: 50 }
         case 'media': return { type, command: 'playpause' }
         case 'system': return { type, command: 'lock' }
@@ -372,7 +375,9 @@ function previewState(index, key, live = false) {
     let on = null
     if (key?.toggle) {
         const source = key.toggle.source ?? 'self'
-        on = source === 'self' ? !!toggles?.[`${state.page}/${index}`] : !!audio?.[source]?.muted
+        if (source === 'self') on = !!toggles?.[`${state.page}/${index}`]
+        else if (source === 'pin') on = !!state.status.pinned
+        else on = !!audio?.[source]?.muted
         if (!live && state.selected === index) on = state.editOn
     }
     return { on, sources: previewSources() }
@@ -1554,6 +1559,12 @@ function keyActionEditor(holder, prop, key) {
             state.editOn = !!previewState(state.selected, key, true).on
             modeChanged = true
         }
+        // «Закрепить» — всегда переключатель, который показывает, закреплён ли экран
+        if (main && type === 'pin' && key.toggle?.source !== 'pin') {
+            key.toggle = { ...(key.toggle ?? {}), source: 'pin' }
+            state.editOn = !!previewState(state.selected, key, true).on
+            modeChanged = true
+        }
         changed()
         if (modeChanged) renderInspector()
         else render()
@@ -1588,6 +1599,9 @@ function actionBody(action, { inMacro = false, key = null, allowHold = !inMacro 
         case 'volume': return volumeEditor(action, key)
         case 'mute': return muteEditor(action, key)
         case 'mixer': return mixerEditor(action)
+        case 'pin': return h('p', { class: 'field-hint flush' }, 'Вкл / выкл. Пока включено, страница на устройстве закреплена: '
+            + 'окно ожидания не появляется, переходы на другие страницы не срабатывают. Панели плеера и громкости открываются как обычно. '
+            + 'Состояние запоминается и после перезапуска.')
         case 'idle': return h('p', { class: 'field-hint flush' }, idlePage()
             ? 'Сразу показывает окно ожидания — как будто деку «заблокировали». Первое нажатие любой кнопки только возвращает кнопки.'
             : 'Окно ожидания ещё не настроено — выберите для него страницу на вкладке «Ожидание» слева.')

@@ -88,8 +88,8 @@ export function validateConfig(config, configDir) {
                 const toggle = key.toggle
                 const toggleWhere = `${where}, включённое состояние`
                 if (!toggle || typeof toggle !== 'object') throw new Error(`${where}: "toggle" должен быть объектом`)
-                if (toggle.source !== undefined && !['self', 'speakers', 'mic'].includes(toggle.source)) {
-                    throw new Error(`${toggleWhere}: "source" должен быть "self", "speakers" или "mic"`)
+                if (toggle.source !== undefined && !['self', 'speakers', 'mic', 'pin'].includes(toggle.source)) {
+                    throw new Error(`${toggleWhere}: "source" должен быть "self", "speakers", "mic" или "pin"`)
                 }
                 if (toggle.action) validate(toggle.action, toggleWhere, config.pages)
                 checkIcon(toggle.icon, toggleWhere, configDir)

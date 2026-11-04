@@ -78,6 +78,8 @@ export async function execute(action, ctx) {
         case 'player': return ctx.openPanel({ kind: 'player' })
         // «Заблокировать» деку: показать окно ожидания, первое нажатие вернёт кнопки
         case 'idle': return ctx.enterIdle()
+        // Закрепить текущий экран: его не заменят окно ожидания и переходы на страницы (панели — можно)
+        case 'pin': return ctx.togglePin()
         case 'system': return systemCommand(action.command)
         case 'macro':
             for (const step of action.steps) {
@@ -157,6 +159,7 @@ export function validate(action, where, pages) {
             break
         case 'player':
         case 'idle':
+        case 'pin':
             break
         case 'system':
             if (action.command !== 'lock') fail('"command" должен быть "lock" (заблокировать компьютер)')

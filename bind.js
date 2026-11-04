@@ -87,11 +87,17 @@ let weather = null
 let updates = null
 let system = sampleSystem()
 
-// Состояния переключателей, которые меняются нажатием. Запоминаются между запусками
+// Состояния переключателей, которые меняются нажатием, и закреплённый экран. Запоминаются между запусками
 const statePath = path.join(configDir, 'state.json')
 let toggles = {}
+let pinned = null // закреплённая страница (действие pin): её не заменяют ни окно ожидания, ни переходы
 try {
-    toggles = JSON.parse(fs.readFileSync(statePath, 'utf8')).toggles ?? {}
+    const saved = JSON.parse(fs.readFileSync(statePath, 'utf8'))
+    toggles = saved.toggles ?? {}
+    if (config.pages[saved.pinned]) {
+        pinned = saved.pinned
+        currentPage = pinned
+    }
 } catch {
     // Файла ещё нет
 }
@@ -100,7 +106,7 @@ function saveToggles() {
     clearTimeout(saveTimer)
     saveTimer = setTimeout(() => {
         try {
-            fs.writeFileSync(statePath, `${JSON.stringify({ toggles }, null, 2)}\n`)
+            fs.writeFileSync(statePath, `${JSON.stringify({ toggles, pinned }, null, 2)}\n`)
         } catch (err) {
             console.error(`Не удалось сохранить состояние кнопок: ${err.message}`)
         }
@@ -128,6 +134,7 @@ const status = () => ({
     ...currentSources(),
     idle: idleActive,
     panel: panel ? (panel.kind === 'player' ? 'player' : panel.target) : null,
+    pinned,
 })
 
 // Сервер стартует первым: занятый порт значит, что утилита уже запущена.
@@ -159,6 +166,7 @@ for (let attempt = 0; ; attempt++) {
 function deviceCommand({ command, key, long, layout }) {
     switch (command) {
         case 'idle':
+            if (pinned) throw new Error('Экран закреплён — сначала снимите закрепление кнопкой на устройстве')
             if (!enterIdle()) throw new Error('Окно ожидания не настроено: выберите для него страницу')
             return
         case 'restart':
@@ -252,6 +260,7 @@ function toggleState(page, index, key) {
     if (!key?.toggle) return null
     const source = key.toggle.source ?? 'self'
     if (source === 'self') return !!toggles[toggleId(page, index)]
+    if (source === 'pin') return !!pinned
     // Перемешивание и повтор плеера — только в панели плеера (src/player.js)
     if (source === 'shuffle') return !!media?.state.media?.shuffle
     if (source === 'repeat') return !!media?.state.media?.repeat && media.state.media.repeat !== 'none'
@@ -457,6 +466,10 @@ async function renderPage() {
 }
 
 function switchPage(name) {
+    if (pinned && name !== currentPage) {
+        console.log('Экран закреплён — страница не меняется')
+        return
+    }
     dropPanel()
     if (name === 'back') {
         if (!pageHistory.length) return
@@ -483,9 +496,27 @@ function setBrightness() {
     if (connected) device.setBrightness(currentBrightness()).catch(() => {})
 }
 
+// Закрепить текущий экран или снять закрепление (действие pin). Окно ожидания при этом закрывается:
+// закрепляется то, что под ним
+function togglePin() {
+    if (pinned) {
+        pinned = null
+        lastActivity = Date.now() // окно ожидания — не сразу, а через обычное время
+        console.log('Экран откреплён')
+    } else {
+        if (idleActive) exitIdle()
+        pinned = currentPage
+        console.log(`Экран закреплён: ${pinned}`)
+    }
+    saveToggles()
+    web.broadcast('status', status())
+    refreshKeys(key => key.toggle?.source === 'pin')
+}
+
 function enterIdle() {
     const page = config.idle?.page
     if (!config.pages[page]) return false
+    if (pinned) return false
     if (idleActive) return true
     dropPanel()
     idleActive = true
@@ -509,7 +540,7 @@ function exitIdle() {
 
 function checkIdle() {
     const { idle } = config
-    if (!idleActive && idle?.after > 0 && config.pages[idle.page] && Date.now() - lastActivity >= idle.after * 1000) enterIdle()
+    if (!idleActive && !pinned && idle?.after > 0 && config.pages[idle.page] && Date.now() - lastActivity >= idle.after * 1000) enterIdle()
 }
 
 /* ---------- Нажатия ---------- */
@@ -518,8 +549,10 @@ const actionContext = {
     switchPage,
     openPanel,
     enterIdle: () => {
+        if (pinned) return console.log('Экран закреплён — окно ожидания не открывается')
         if (!enterIdle()) throw new Error('окно ожидания не настроено: выберите для него страницу')
     },
+    togglePin,
     get audio() { return audio },
     get media() { return media },
 }
@@ -681,6 +714,11 @@ fs.watch(configPath, () => {
                 currentPage = pageBeforeIdle
             }
             if (!config.pages[currentPage]) currentPage = startPageOf(config)
+            // Закреплённую страницу удалили — закрепление снимается
+            if (pinned && !config.pages[pinned]) {
+                pinned = null
+                saveToggles()
+            }
             pageHistory = pageHistory.filter(name => config.pages[name])
             weather?.setPlace(config.weather)
             console.log('Конфиг перезагружен')
