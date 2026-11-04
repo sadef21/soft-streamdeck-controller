@@ -3,22 +3,7 @@
   "startPage": "main",
   "pages": {
     "main": {
-      "0": { "label": "Микро+", "color": "#ec407a", "action": { "type": "volume", "step": 5, "target": "mic" } },
-      "1": { "label": "Предыдущий", "color": "#1db954", "icon": "lucide:skip-back", "action": { "type": "media", "command": "prev" } },
-      "2": { "meter": "nowPlaying", "color": "#1db954", "action": { "type": "media", "command": "playpause" } },
-      "3": { "label": "Следующий", "color": "#1db954", "icon": "lucide:skip-forward", "action": { "type": "media", "command": "next" } },
-      "4": { "label": "Звук+", "color": "#1565c0", "action": { "type": "volume", "step": 5 }, "icon": "lucide:volume-2" },
-      "5": { "label": "Микро−", "color": "#ec407a", "action": { "type": "volume", "step": -5, "target": "mic" } },
-      "6": {
-        "label": "Диспетчер задач",
-        "color": "#00695C",
-        "action": { "type": "hotkey", "keys": "ctrl+shift+esc" },
-        "icon": "lucide:app-window"
-      },
-      "7": { "label": "Скриншот", "color": "#455A64", "action": { "type": "hotkey", "keys": "win+shift+s" }, "icon": "lucide:image" },
-      "8": { "label": "Заблокировать", "color": "#90a4ae", "action": { "type": "system", "command": "lock" } },
-      "9": { "label": "Звук-", "color": "#1565c0", "action": { "type": "volume", "step": -5 }, "icon": "lucide:volume-1" },
-      "10": {
+      "0": {
         "label": "Микрофон",
         "color": "#ec407a",
         "icon": "lucide:mic",
@@ -27,10 +12,10 @@
         "meter": "mic",
         "longPress": { "type": "mixer", "target": "mic" }
       },
-      "11": { "icon": "lucide:rocket" },
-      "12": { "icon": "lucide:sparkles" },
-      "13": { "icon": "lucide:thumbs-up" },
-      "14": {
+      "1": { "label": "Предыдущий", "color": "#1db954", "icon": "lucide:skip-back", "action": { "type": "media", "command": "prev" } },
+      "2": { "meter": "nowPlaying", "color": "#1db954", "action": { "type": "media", "command": "playpause" }, "longPress": { "type": "player" } },
+      "3": { "label": "Следующий", "color": "#1db954", "icon": "lucide:skip-forward", "action": { "type": "media", "command": "next" } },
+      "4": {
         "label": "Звук",
         "color": "#1565c0",
         "icon": "lucide:volume-2",
@@ -38,7 +23,18 @@
         "toggle": { "source": "speakers", "label": "Без звука", "icon": "lucide:volume-x", "color": "#c62828" },
         "meter": "volume",
         "longPress": { "type": "mixer", "target": "speakers" }
-      }
+      },
+      "6": {
+        "label": "Диспетчер задач",
+        "color": "#00695C",
+        "action": { "type": "hotkey", "keys": "ctrl+shift+esc" },
+        "icon": "lucide:app-window"
+      },
+      "7": { "label": "Скриншот", "color": "#455A64", "action": { "type": "hotkey", "keys": "win+shift+s" }, "icon": "lucide:image" },
+      "8": { "label": "Заблокировать", "color": "#90a4ae", "action": { "type": "system", "command": "lock" } },
+      "11": { "icon": "lucide:rocket" },
+      "12": { "icon": "lucide:sparkles" },
+      "13": { "icon": "lucide:thumbs-up" }
     },
     "Ожидание": {
       "0": { "label": "Микрофон", "meter": "mic", "color": "#ad1457" },
