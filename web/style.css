@@ -36,6 +36,53 @@ body {
 
 button, input, select, textarea { font: inherit; color: inherit; }
 
+/* Тонкие тёмные полосы прокрутки — одинаковые в любом браузере.
+   Без этого в одних браузерах полоса широкая и ложится поверх содержимого, в других — плавающая */
+* { scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: #444b5a; }
+
+/* Ползунки рисуем сами: стандартные в каждом браузере свои. Заливка до бегунка — --fill (ui.js) */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 20px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--accent) var(--fill, 50%), var(--line-2) var(--fill, 50%));
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+input[type="range"]::-moz-range-track { height: 6px; border-radius: 999px; background: var(--line-2); }
+input[type="range"]::-moz-range-progress { height: 6px; border-radius: 999px; background: var(--accent); }
+input[type="range"]::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+input[type="range"]:focus { outline: none; }
+input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px var(--accent-soft), 0 1px 4px rgba(0, 0, 0, 0.5); }
+input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 4px var(--accent-soft), 0 1px 4px rgba(0, 0, 0, 0.5); }
+
 kbd {
   font: 600 11px/1 "Segoe UI", system-ui, sans-serif;
   padding: 3px 5px;
@@ -190,6 +237,8 @@ kbd {
 .inspector {
   min-height: 0;
   overflow: auto;
+  /* Место под полосу прокрутки зарезервировано: она не ложится поверх вкладок и полей */
+  scrollbar-gutter: stable;
   background: var(--panel);
 }
 
@@ -376,7 +425,7 @@ kbd {
 
 /* ---------- Инспектор ---------- */
 
-.panel { padding: 18px 20px 28px; }
+.panel { padding: 18px 16px 28px; }
 
 .panel-head {
   display: flex;
@@ -392,7 +441,7 @@ kbd {
 /* Вкладки настроек кнопки */
 .key-tabs {
   display: flex;
-  gap: 4px;
+  gap: 2px;
   margin: 10px 0 2px;
   border-bottom: 1px solid var(--line);
 }
@@ -401,9 +450,12 @@ kbd {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  flex: 1;
+  /* Ширина по подписи: короткие вкладки уже. В узкой панели ужимаются, а не вылезают за край */
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
   justify-content: center;
-  padding: 9px 8px 10px;
+  padding: 9px 2px 10px;
   border: 0;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
@@ -415,7 +467,16 @@ kbd {
 }
 .key-tab:hover { color: var(--text); }
 .key-tab.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
-.key-tab .ui-ico { width: 15px; height: 15px; }
+.key-tab .ui-ico { width: 15px; height: 15px; flex: none; }
+.key-tab-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* Когда подписи всех вкладок не помещаются, подпись остаётся только у открытой, у остальных — значок
+   (название — во всплывающей подсказке). Ширину смотрим у самой полосы вкладок */
+.key-tabs { container-type: inline-size; }
+@container (max-width: 340px) {
+  .key-tabs-many .key-tab:not(.active) .key-tab-label { display: none; }
+  .key-tabs-many .key-tab:not(.active) { flex: 0 0 auto; padding-inline: 10px; }
+}
+.key-tab-dot { flex: none; }
 .key-tab-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); opacity: 0.8; }
 
 .place-results { display: flex; flex-direction: column; gap: 4px; }
@@ -652,7 +713,7 @@ details.more > .stack { margin-top: 12px; }
 .tips { margin: 0; padding-left: 18px; color: var(--muted); display: flex; flex-direction: column; gap: 6px; }
 
 .range-row { display: flex; align-items: center; gap: 12px; }
-.range-row input { flex: 1; accent-color: var(--accent); }
+.range-row input { flex: 1; min-width: 0; }
 .range-row output { width: 42px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
 
 .start-badge { display: inline-flex; align-items: center; gap: 6px; color: var(--warn); font-size: 13px; }

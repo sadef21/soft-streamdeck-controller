@@ -20,7 +20,19 @@ export function h(tag, props, ...children) {
         if (child == null || child === false) continue
         el.append(child instanceof Node ? child : String(child))
     }
+    // Ползунок: заливка дорожки до бегунка (--fill в style.css) следует за значением
+    if (tag === 'input' && props?.type === 'range') {
+        syncRange(el)
+        el.addEventListener('input', () => syncRange(el))
+    }
     return el
+}
+
+function syncRange(el) {
+    const min = Number(el.min || 0)
+    const max = Number(el.max || 100)
+    const share = max > min ? (Number(el.value) - min) / (max - min) : 0
+    el.style.setProperty('--fill', `${Math.min(100, Math.max(0, share * 100))}%`)
 }
 
 // Иконка интерфейса из библиотеки Lucide, красится в цвет текста (currentColor)

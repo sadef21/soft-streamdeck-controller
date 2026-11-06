@@ -1123,12 +1123,14 @@ async function openBackup(name, time) {
 
 // Полоса вкладок. tabs: [id, название, иконка, isSet?] — isSet() true рисует точку «здесь что-то настроено»
 function tabBar(tabs, current, onPick, subject) {
-    return h('div', { class: 'key-tabs', role: 'tablist' }, tabs.map(([id, title, glyph, isSet]) => h('button', {
+    // Четыре и больше вкладок в узкой панели не помещаются с подписями — см. .key-tabs-many в style.css
+    return h('div', { class: `key-tabs${tabs.length > 3 ? ' key-tabs-many' : ''}`, role: 'tablist' }, tabs.map(([id, title, glyph, isSet]) => h('button', {
         class: `key-tab${current === id ? ' active' : ''}`,
         role: 'tab',
         'aria-selected': current === id ? 'true' : 'false',
         onclick: () => onPick(id),
-    }, icon(glyph), title, isSet?.(subject) && h('span', { class: 'key-tab-dot' }))))
+        title,
+    }, icon(glyph), h('span', { class: 'key-tab-label' }, title), isSet?.(subject) && h('span', { class: 'key-tab-dot' }))))
 }
 
 // Отметка в панели страницы, которая назначена окном ожидания
